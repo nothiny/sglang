@@ -43,6 +43,33 @@ class TestRMSNormInputShape(CustomTestCase):
                 torch.testing.assert_close(actual[1], expected[1], atol=1e-2, rtol=1e-2)
 
 
+class TestRMSNormNoWeight(CustomTestCase):
+    @classmethod
+    def setUpClass(cls):
+        if not torch.cuda.is_available():
+            raise unittest.SkipTest("CUDA is not available")
+
+    def test_has_weight_false_device_transfer(self):
+        """A scaleless norm must move its unit scale with the module.
+
+        ``RMSNorm(has_weight=False)`` is used by model attention paths.  Before
+        the regression fix, its unit scale was an unregistered Tensor, so a
+        CPU-constructed module moved to CUDA kept ``weight`` on CPU and failed
+        during forward.
+        """
+        layer = RMSNorm(512, has_weight=False, force_native=True).to("cuda")
+        x = torch.randn(2, 512, device="cuda", dtype=torch.bfloat16)
+
+        self.assertEqual(layer.weight.device, x.device)
+        self.assertNotIn("weight", layer.state_dict())
+
+        with torch.inference_mode():
+            output = layer(x)
+
+        self.assertEqual(output.shape, x.shape)
+        self.assertEqual(output.device, x.device)
+
+
 class TestRMSNormFp8QuantFusion(CustomTestCase):
     DTYPES = [torch.bfloat16, torch.half]
     NUM_TOKENS = [7, 83, 512]

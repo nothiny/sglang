@@ -473,7 +473,11 @@ class RMSNorm(BaseFusedOp):
         if self.has_weight:
             self.weight = nn.Parameter(torch.ones(hidden_size, dtype=weight_dtype))
         else:
-            self.weight = torch.ones(hidden_size, dtype=weight_dtype)
+            self.register_buffer(
+                "weight",
+                torch.ones(hidden_size, dtype=weight_dtype),
+                persistent=False,
+            )
         self.variance_epsilon = eps
         self.hidden_size = hidden_size
         self.variance_size_override = (
